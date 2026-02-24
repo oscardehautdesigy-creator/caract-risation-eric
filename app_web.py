@@ -35,14 +35,10 @@ GROUPES_SORTANT = {
 
 # --- FONCTIONS ---
 def afficher_logo(largeur=None):
-    """Affiche le logo s'il existe à la racine du projet"""
     if os.path.exists(NOM_LOGO):
-        if largeur:
-            st.image(NOM_LOGO, width=largeur)
-        else:
-            st.image(NOM_LOGO, use_container_width=True)
-    else:
-        st.write("### PAPREC")
+        if largeur: st.image(NOM_LOGO, width=largeur)
+        else: st.image(NOM_LOGO, use_container_width=True)
+    else: st.write("### PAPREC")
 
 def enregistrer_donnees(mode, header, dict_poids):
     nom_f = FICHIERS[mode]
@@ -69,9 +65,6 @@ def enregistrer_donnees(mode, header, dict_poids):
             cell.alignment = Alignment(horizontal="center")
         wb.save(nom_f)
         return True
-    except PermissionError:
-        st.error("❌ Erreur : Le fichier Excel est ouvert. Fermez-le avant d'enregistrer.")
-        return False
     except Exception as e:
         st.error(f"❌ Erreur Excel : {e}")
         return False
@@ -79,20 +72,15 @@ def enregistrer_donnees(mode, header, dict_poids):
 # --- CONFIGURATION PAGE ---
 st.set_page_config(page_title="PAPREC - Caractérisation", layout="wide")
 
-if 'mode' not in st.session_state:
-    st.session_state.mode = None
-if 'photos_temp' not in st.session_state:
-    st.session_state.photos_temp = {}
+if 'mode' not in st.session_state: st.session_state.mode = None
+if 'photos_temp' not in st.session_state: st.session_state.photos_temp = {}
 
 # --- ECRAN D'ACCUEIL ---
 if st.session_state.mode is None:
     col_l1, col_l2, col_l3 = st.columns([1, 1.2, 1])
-    with col_l2:
-        afficher_logo()
-
+    with col_l2: afficher_logo()
     st.markdown("<h1 style='text-align: center; color: #0070c0;'>Fiche de caractérisation</h1>", unsafe_allow_html=True)
     st.write("##") 
-    
     c1, c2 = st.columns(2)
     if c1.button("📥 CARACT ENTRANT", use_container_width=True):
         st.session_state.mode = "CARACT ENTRANT"
@@ -103,15 +91,13 @@ if st.session_state.mode is None:
 
 # --- ECRAN DE SAISIE ---
 else:
-    # Barre supérieure : Retour et Logo réduit
     col_back, col_logo_mini = st.columns([8, 2])
     with col_back:
         if st.button("⬅ Retour"):
             st.session_state.mode = None
             st.session_state.photos_temp.clear()
             st.rerun()
-    with col_logo_mini:
-        afficher_logo(largeur=100)
+    with col_logo_mini: afficher_logo(largeur=100)
 
     st.markdown(f"<h2 style='text-align: center;'>Saisie : {st.session_state.mode}</h2>", unsafe_allow_html=True)
 
@@ -129,7 +115,6 @@ else:
     
     for g_name, info in groupes.items():
         st.markdown(f"<div style='background-color:{info['color']}; color:white; padding:10px; border-radius:5px; margin-top:20px; margin-bottom:10px;'><b>{g_name}</b></div>", unsafe_allow_html=True)
-        
         items = info["items"]
         for i in range(0, len(items), 2):
             cols = st.columns(2)
@@ -140,38 +125,44 @@ else:
                         c_poids, c_photo = st.columns([1, 1])
                         dict_entrees[matiere] = c_poids.number_input(f"{matiere} (kg)", min_value=0.0, step=0.1, key=f"p_{matiere}")
                         
-                        # --- SYSTÈME PHOTO ---
+                        # --- GESTION PHOTO AVEC CHOIX SAUVEGARDER/SUPPRIMER ---
                         with c_photo.popover("📸 Photo"):
-                            img = st.camera_input(f"Scanner {matiere}", key=f"cam_{matiere}")
-                            if img:
-                                st.session_state.photos_temp[matiere] = img
-                                st.success("✅ Image capturée")
-                                st.image(img, width=150) # Confirmation visuelle
-                            elif matiere in st.session_state.photos_temp:
-                                st.info("✅ Photo déjà enregistrée")
-                                st.image(st.session_state.photos_temp[matiere], width=100)
+                            # Si une photo est déjà en mémoire pour cette matière
+                            if matiere in st.session_state.photos_temp:
+                                st.image(st.session_state.photos_temp[matiere], caption="Photo enregistrée", width=200)
+                                if st.button(f"🗑️ Supprimer la photo", key=f"del_{matiere}"):
+                                    del st.session_state.photos_temp[matiere]
+                                    st.rerun()
+                            else:
+                                img = st.camera_input(f"Capturer {matiere}", key=f"cam_{matiere}")
+                                if img:
+                                    st.image(img, caption="Aperçu de la capture", width=200)
+                                    col_v1, col_v2 = st.columns(2)
+                                    if col_v1.button("✅ Sauvegarder", key=f"save_{matiere}", type="primary"):
+                                        st.session_state.photos_temp[matiere] = img
+                                        st.success("Photo mise en mémoire !")
+                                        st.rerun()
+                                    if col_v2.button("❌ Annuler", key=f"cancel_{matiere}"):
+                                        st.rerun()
 
     st.markdown("---")
-    if st.button("💾 ENREGISTRER DANS EXCEL ET PHOTOS", type="primary", use_container_width=True):
+    if st.button("💾 ENREGISTRER DÉFINITIVEMENT (EXCEL + PHOTOS)", type="primary", use_container_width=True):
         date_folder = date_saisie.replace("/", "-")
         nom_dossier = f"{flux_sel}_{date_folder}"
         sous_type = "ENTRANT" if st.session_state.mode == "CARACT ENTRANT" else "SORTANT"
         path_complet = os.path.join("PHOTOS_CARACT", sous_type, nom_dossier)
         
         try:
-            # Sauvegarde des images
             if st.session_state.photos_temp:
-                if not os.path.exists(path_complet):
-                    os.makedirs(path_complet)
+                if not os.path.exists(path_complet): os.makedirs(path_complet)
                 for mat, data in st.session_state.photos_temp.items():
                     with open(os.path.join(path_complet, f"{mat}.jpg"), "wb") as f:
                         f.write(data.getbuffer())
 
-            # Sauvegarde Excel
             h = {'date': date_saisie, 'flux': flux_sel, 'equipe': equipe_sel, 'lieu': lieu_sel}
             if enregistrer_donnees(st.session_state.mode, h, dict_entrees):
-                st.success(f"✅ Données et photos sauvegardées avec succès !")
+                st.success(f"✅ Terminé ! Dossier créé : {nom_dossier}")
                 st.balloons()
                 st.session_state.photos_temp.clear()
         except Exception as e:
-            st.error(f"❌ Erreur lors de la sauvegarde : {e}")
+            st.error(f"❌ Erreur : {e}")
