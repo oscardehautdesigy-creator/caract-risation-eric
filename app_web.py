@@ -41,22 +41,17 @@ def enregistrer_donnees(mode, header, dict_poids):
         ws = wb["SAISIE"]
         row = 2
         while ws.cell(row=row, column=2).value: row += 1
-        
         groupes = GROUPES_ENTRANT if mode == "CARACT ENTRANT" else GROUPES_SORTANT
         liste_ordonnee = []
         for g in groupes.values(): liste_ordonnee.extend(g["items"])
-        
         poids_finaux = [float(str(dict_poids.get(m, 0)).replace(',', '.')) for m in liste_ordonnee]
-        
         if mode == "CARACT SORTANT":
             ligne = [header['flux'], header['date'], header['equipe'], header['lieu']] + poids_finaux
         else:
             ligne = [header['flux'], header['date']] + poids_finaux
-            
         for i, v in enumerate(ligne):
             cell = ws.cell(row=row, column=i+2, value=v)
             cell.alignment = Alignment(horizontal="center")
-            
         wb.save(nom_f)
         return True
     except PermissionError:
@@ -71,12 +66,15 @@ st.set_page_config(page_title="PAPREC - Caractérisation", layout="wide")
 
 if 'mode' not in st.session_state:
     st.session_state.mode = None
-if 'session_time' not in st.session_state:
-    st.session_state.session_time = datetime.now().strftime("%Hh%M")
+if 'photos_temp' not in st.session_state:
+    st.session_state.photos_temp = {}
 
 # --- ECRAN D'ACCUEIL ---
 if st.session_state.mode is None:
-    st.title("Fiche de caractérisation")
+    # TITRE CENTRÉ
+    st.markdown("<h1 style='text-align: center; color: #0070c0;'>Fiche de caractérisation</h1>", unsafe_allow_html=True)
+    
+    st.write("##") # Espace
     c1, c2 = st.columns(2)
     if c1.button("📥 CARACT ENTRANT", use_container_width=True):
         st.session_state.mode = "CARACT ENTRANT"
@@ -87,24 +85,19 @@ if st.session_state.mode is None:
 
 # --- ECRAN DE SAISIE ---
 else:
-    st.button("⬅ Retour", on_click=lambda: setattr(st.session_state, 'mode', None))
-    st.header(f"Saisie : {st.session_state.mode}")
+    st.button("⬅ Retour", on_click=lambda: (setattr(st.session_state, 'mode', None), st.session_state.photos_temp.clear()))
+    
+    # TITRE DE SAISIE CENTRÉ
+    st.markdown(f"<h2 style='text-align: center;'>Saisie : {st.session_state.mode}</h2>", unsafe_allow_html=True)
 
     with st.container(border=True):
         col1, col2, col3, col4 = st.columns(4)
-        # DATE AU FORMAT JJ-MM-AAAA
-        date_saisie = col1.text_input("Date:", datetime.now().strftime("%d-%m-%Y"))
-        
+        date_saisie = col1.text_input("Date (JJ/MM/AAAA):", datetime.now().strftime("%d/%m/%Y"))
         lbl = "Client:" if st.session_state.mode == "CARACT ENTRANT" else "Flux:"
         lst = LISTE_CLIENTS_ENTRANT if st.session_state.mode == "CARACT ENTRANT" else LISTE_FLUX_SORTANT
         flux_sel = col2.selectbox(lbl, lst)
         equipe_sel = col3.selectbox("Équipe:", LISTE_EQUIPES)
         lieu_sel = col4.selectbox("Lieu:", LISTE_LIEUX)
-
-    # Dossier de session pour les photos
-    date_folder = datetime.now().strftime("%d-%m-%Y")
-    session_id = f"{st.session_state.session_time}_{flux_sel.replace(' ', '_')}"
-    path_session = f"PHOTOS_CARACT/{date_folder}/{session_id}"
 
     groupes = GROUPES_ENTRANT if st.session_state.mode == "CARACT ENTRANT" else GROUPES_SORTANT
     dict_entrees = {}
@@ -112,7 +105,6 @@ else:
     for g_name, info in groupes.items():
         st.markdown(f"<div style='background-color:{info['color']}; color:white; padding:10px; border-radius:5px; margin-top:20px; margin-bottom:10px;'><b>{g_name}</b></div>", unsafe_allow_html=True)
         
-        # Affichage en colonnes pour plus de clarté
         items = info["items"]
         for i in range(0, len(items), 2):
             cols = st.columns(2)
@@ -123,20 +115,34 @@ else:
                         c_poids, c_photo = st.columns([1, 1])
                         dict_entrees[matiere] = c_poids.number_input(f"{matiere} (kg)", min_value=0.0, step=0.1, key=f"p_{matiere}")
                         
+                        # Système de capture photo
                         with c_photo.popover("📸 Photo"):
-                            img = st.camera_input(f"Caméra {matiere}", key=f"cam_{matiere}")
+                            img = st.camera_input(f"Scanner {matiere}", key=f"cam_{matiere}")
                             if img:
-                                if st.button(f"Sauvegarder {matiere}", key=f"btn_save_{matiere}"):
-                                    os.makedirs(path_session, exist_ok=True)
-                                    nom_img = f"{matiere}_{datetime.now().strftime('%H%M%S')}.jpg"
-                                    with open(os.path.join(path_session, nom_img), "wb") as f:
-                                        f.write(img.getbuffer())
-                                    st.toast(f"Photo {matiere} enregistrée !", icon="✅")
+                                st.session_state.photos_temp[matiere] = img
+                                st.success(f"Image {matiere} prête !")
 
     st.markdown("---")
-    if st.button("💾 ENREGISTRER DANS EXCEL", type="primary", use_container_width=True):
-        h = {'date': date_saisie, 'flux': flux_sel, 'equipe': equipe_sel, 'lieu': lieu_sel}
-        if enregistrer_donnees(st.session_state.mode, h, dict_entrees):
-            st.success(f"Données enregistrées ! Dossier : {session_id}")
-            st.balloons()
-            st.session_state.session_time = datetime.now().strftime("%Hh%M")
+    if st.button("💾 ENREGISTRER DANS EXCEL ET PHOTOS", type="primary", use_container_width=True):
+        date_folder = date_saisie.replace("/", "-")
+        nom_dossier = f"{flux_sel}_{date_folder}"
+        sous_type = "ENTRANT" if st.session_state.mode == "CARACT ENTRANT" else "SORTANT"
+        path_complet = os.path.join("PHOTOS_CARACT", sous_type, nom_dossier)
+        
+        try:
+            if st.session_state.photos_temp:
+                if not os.path.exists(path_complet):
+                    os.makedirs(path_complet)
+                for mat, data in st.session_state.photos_temp.items():
+                    nom_fichier = f"{mat}.jpg"
+                    with open(os.path.join(path_complet, nom_fichier), "wb") as f:
+                        f.write(data.getbuffer())
+
+            h = {'date': date_saisie, 'flux': flux_sel, 'equipe': equipe_sel, 'lieu': lieu_sel}
+            if enregistrer_donnees(st.session_state.mode, h, dict_entrees):
+                st.success(f"✅ Données et photos sauvegardées dans : {nom_dossier}")
+                st.balloons()
+                st.session_state.photos_temp.clear()
+                
+        except Exception as e:
+            st.error(f"❌ Erreur lors de la sauvegarde : {e}")
