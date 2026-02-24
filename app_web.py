@@ -4,6 +4,7 @@ import pandas as pd
 from datetime import datetime
 from openpyxl import load_workbook
 from openpyxl.styles import Alignment
+import time
 
 # --- CONFIGURATION ---
 FICHIERS = {"CARACT ENTRANT": "Suivi CARACT_ENTRANT.xlsx", "CARACT SORTANT": "CARACT_SORTANT.xlsx"}
@@ -123,11 +124,10 @@ else:
                     matiere = items[i+j]
                     with cols[j].container(border=True):
                         c_poids, c_photo = st.columns([1, 1])
+                        # Initialisation du poids dans les entrées
                         dict_entrees[matiere] = c_poids.number_input(f"{matiere} (kg)", min_value=0.0, step=0.1, key=f"p_{matiere}")
                         
-                        # --- GESTION PHOTO AVEC CHOIX SAUVEGARDER/SUPPRIMER ---
                         with c_photo.popover("📸 Photo"):
-                            # Si une photo est déjà en mémoire pour cette matière
                             if matiere in st.session_state.photos_temp:
                                 st.image(st.session_state.photos_temp[matiere], caption="Photo enregistrée", width=200)
                                 if st.button(f"🗑️ Supprimer la photo", key=f"del_{matiere}"):
@@ -136,16 +136,16 @@ else:
                             else:
                                 img = st.camera_input(f"Capturer {matiere}", key=f"cam_{matiere}")
                                 if img:
-                                    st.image(img, caption="Aperçu de la capture", width=200)
+                                    st.image(img, caption="Aperçu", width=200)
                                     col_v1, col_v2 = st.columns(2)
                                     if col_v1.button("✅ Sauvegarder", key=f"save_{matiere}", type="primary"):
                                         st.session_state.photos_temp[matiere] = img
-                                        st.success("Photo mise en mémoire !")
                                         st.rerun()
                                     if col_v2.button("❌ Annuler", key=f"cancel_{matiere}"):
                                         st.rerun()
 
     st.markdown("---")
+    # --- ACTION FINALE D'ENREGISTREMENT ---
     if st.button("💾 ENREGISTRER DÉFINITIVEMENT (EXCEL + PHOTOS)", type="primary", use_container_width=True):
         date_folder = date_saisie.replace("/", "-")
         nom_dossier = f"{flux_sel}_{date_folder}"
@@ -153,16 +153,33 @@ else:
         path_complet = os.path.join("PHOTOS_CARACT", sous_type, nom_dossier)
         
         try:
+            # 1. Sauvegarde des photos
             if st.session_state.photos_temp:
                 if not os.path.exists(path_complet): os.makedirs(path_complet)
                 for mat, data in st.session_state.photos_temp.items():
                     with open(os.path.join(path_complet, f"{mat}.jpg"), "wb") as f:
                         f.write(data.getbuffer())
 
+            # 2. Sauvegarde Excel
             h = {'date': date_saisie, 'flux': flux_sel, 'equipe': equipe_sel, 'lieu': lieu_sel}
             if enregistrer_donnees(st.session_state.mode, h, dict_entrees):
-                st.success(f"✅ Terminé ! Dossier créé : {nom_dossier}")
+                # 3. Message de succès et redirection
+                st.success(f"✅ Enregistrement réussi ! Retour à l'accueil...")
                 st.balloons()
+                
+                # Attente courte pour que l'utilisateur voit le message
+                time.sleep(2)
+                
+                # 4. RÉINITIALISATION COMPLÈTE
+                st.session_state.mode = None
                 st.session_state.photos_temp.clear()
+                
+                # Nettoyage des widgets (poids à zéro)
+                for key in list(st.session_state.keys()):
+                    if key.startswith("p_") or key.startswith("cam_"):
+                        del st.session_state[key]
+                
+                st.rerun()
+                
         except Exception as e:
-            st.error(f"❌ Erreur : {e}")
+            st.error(f"❌ Erreur lors de la sauvegarde : {e}")
