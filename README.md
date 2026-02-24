@@ -1,1 +1,0 @@
-# caract-risation-eric
