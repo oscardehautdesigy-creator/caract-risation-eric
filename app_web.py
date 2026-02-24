@@ -5,91 +5,6 @@ from datetime import datetime
 from openpyxl import load_workbook
 from openpyxl.styles import Alignment
 
-# --- CONFIGURATION DES LISTES ---
-FICHIERS = {"CARACT ENTRANT": "Suivi CARACT_ENTRANT.xlsx", "CARACT SORTANT": "CARACT_SORTANT.xlsx"}
-LISTE_EQUIPES = ["MATIN", "APRES-MIDI"]
-LISTE_LIEUX = ["SILO", "CABINE", "COMPACTEUR", "COLLECTE"]
-LISTE_CLIENTS_ENTRANT = ["GARE MONTPARNASSE", "LE PETIT PLUS", "LA COURNEUVE", "PSM", "PSM - ADP BEAUVAIS", "LBM", "AEROVILLE", "CDG", "HAUSSMAN", "ORLY", "CEMEX", "LE BOURGET & LBM", "ROISSY", "DISNEYLAND", "VALLEE VILLAGE & 4 TEMPS", "GARE DE LYON", "SNCF", "VALODEA", "VALOR'AISME", "SITRU", "SYCTOM", "AUTRES"]
-LISTE_FLUX_SORTANT = ["JRM", "EMR", "CARTON", "GM", "PETQ9", "FLUX DEV", "PETB", "PEPP", "ELA", "FILM", "ACIER", "ALU", "PETIT ALU", "REFUS"]
-
-COLORS = {"BLUE": "#0070c0", "LIGHT_BLUE": "#00b0f0", "GREEN": "#00b050", "YELLOW": "#ffc000", "ORANGE": "#ed7d31", "RED": "#c00000"}
-
-GROUPES_ENTRANT = {
-    "FIBREUX": {"color": COLORS["BLUE"], "items": ["CARTON", "CARTONNETTE"]},
-    "FIBREUX 2": {"color": COLORS["LIGHT_BLUE"], "items": ["ECRIT COULEUR", "JRM", "GM"]},
-    "ELA": {"color": COLORS["GREEN"], "items": ["ELA"]},
-    "PLASTIQUES": {"color": COLORS["YELLOW"], "items": ["PEPP", "PET Q9", "PET Q5", "PET B", "FILM"]},
-    "METAUX": {"color": COLORS["ORANGE"], "items": ["ACIER", "ALU", "PETIT ALU"]},
-    "REFUS / AUTRES": {"color": COLORS["RED"], "items": ["PB REFUSES", "FILM REFUSES", "EMBALLAGES NOIRS", "AUTRES EMBALLAGES NON RECYCLABLES", "BOIS", "VERRE", "DDS", "D3E", "IMBRIQUES", "PLASTIQUES NON EMBALLAGES", "FERRAILLES", "GRAVATS", "TEXTILE", "EMBALLAGES NON VIDES / SOUILLÉS", "REFUS", "PAPIER MOUILLE", "FINES"]}
-}
-
-GROUPES_SORTANT = {
-    "FIBREUX": {"color": COLORS["BLUE"], "items": ["JRM", "EMR", "CARTON", "GM"]},
-    "PLASTIQUES": {"color": COLORS["YELLOW"], "items": ["PETQ9", "FLUX DEV", "PET B", "PEPP", "ELA", "FILM"]},
-    "METAUX": {"color": COLORS["ORANGE"], "items": ["ACIER", "ALU", "PETIT ALU"]},
-    "AUTRES": {"color": COLORS["RED"], "items": ["REFUS"]}
-}
-
-# --- LOGIQUE D'ENREGISTREMENT EXCEL ---
-def enregistrer_donnees(mode, header, dict_poids):
-    nom_f = FICHIERS[mode]
-    if not os.path.exists(nom_f):
-        st.error(f"Fichier {nom_f} introuvable.")
-        return False
-    try:
-        wb = load_workbook(nom_f)
-        ws = wb["SAISIE"]
-        row = 2
-        while ws.cell(row=row, column=2).value: row += 1
-        groupes = GROUPES_ENTRANT if mode == "CARACT ENTRANT" else GROUPES_SORTANT
-        liste_ordonnee = []
-        for g in groupes.values(): liste_ordonnee.extend(g["items"])
-        poids_finaux = [float(str(dict_poids.get(m, 0)).replace(',', '.')) for m in liste_ordonnee]
-        if mode == "CARACT SORTANT":
-            ligne = [header['flux'], header['date'], header['equipe'], header['lieu']] + poids_finaux
-        else:
-            ligne = [header['flux'], header['date']] + poids_finaux
-        for i, v in enumerate(ligne):
-            cell = ws.cell(row=row, column=i+2, value=v)
-            cell.alignment = Alignment(horizontal="center")
-        wb.save(nom_f)
-        return True
-    except PermissionError:
-        st.error("❌ Erreur : Le fichier Excel est ouvert. Fermez-le avant d'enregistrer.")
-        return False
-    except Exception as e:
-        st.error(f"❌ Erreur Excel : {e}")
-        return False
-
-# --- INTERFACE ---
-st.set_page_config(page_title="PAPREC - Caractérisation", layout="wide")
-
-# Initialisation du session_state
-if 'mode' not in st.session_state:
-    st.session_state.mode = None
-if 'photos_temp' not in st.session_state:
-    st.session_state.photos_temp = {}
-
-# --- ECRAN D'ACCUEIL ---
-if st.session_state.mode is None:
-    # Centrage du Logo
-    col_l1, col_l2, col_l3 = st.columns([1, 1.5, 1])
-    with col_l2:
-        st.image("PAPREC_Logotype_V_BLACK.jpg", use_container_width=True)
-
-    # TITRE CENTRÉ
-    st.markdown("<h1 style='text-align: center; color: #0070c0;'>Fiche de caractérisation</h1>", unsafe_allow_html=True)
-    
-    st.write("##") # Espace
-    c1, c2 = st.columns(2)
-    if c1.button("📥 CARACT ENTRANT", use_container_width=True):
-import os
-import streamlit as st
-import pandas as pd
-from datetime import datetime
-from openpyxl import load_workbook
-from openpyxl.styles import Alignment
-
 # --- CONFIGURATION ---
 FICHIERS = {"CARACT ENTRANT": "Suivi CARACT_ENTRANT.xlsx", "CARACT SORTANT": "CARACT_SORTANT.xlsx"}
 LISTE_EQUIPES = ["MATIN", "APRES-MIDI"]
@@ -118,16 +33,15 @@ GROUPES_SORTANT = {
     "AUTRES": {"color": COLORS["RED"], "items": ["REFUS"]}
 }
 
-# --- FONCTIONS UTILES ---
+# --- FONCTIONS ---
 def afficher_logo(largeur=None):
-    """Affiche le logo s'il existe, sinon affiche un message d'info discret"""
     if os.path.exists(NOM_LOGO):
         if largeur:
             st.image(NOM_LOGO, width=largeur)
         else:
             st.image(NOM_LOGO, use_container_width=True)
     else:
-        st.info("Logo Paprec")
+        st.write("### PAPREC")
 
 def enregistrer_donnees(mode, header, dict_poids):
     nom_f = FICHIERS[mode]
@@ -155,13 +69,13 @@ def enregistrer_donnees(mode, header, dict_poids):
         wb.save(nom_f)
         return True
     except PermissionError:
-        st.error("❌ Erreur : Le fichier Excel est ouvert. Fermez-le.")
+        st.error("❌ Erreur : Le fichier Excel est ouvert.")
         return False
     except Exception as e:
         st.error(f"❌ Erreur Excel : {e}")
         return False
 
-# --- INTERFACE STREAMLIT ---
+# --- INTERFACE ---
 st.set_page_config(page_title="PAPREC - Caractérisation", layout="wide")
 
 if 'mode' not in st.session_state:
@@ -171,7 +85,6 @@ if 'photos_temp' not in st.session_state:
 
 # --- ECRAN D'ACCUEIL ---
 if st.session_state.mode is None:
-    # Centrage du Logo
     col_l1, col_l2, col_l3 = st.columns([1, 1.2, 1])
     with col_l2:
         afficher_logo()
@@ -189,7 +102,6 @@ if st.session_state.mode is None:
 
 # --- ECRAN DE SAISIE ---
 else:
-    # Barre supérieure : Bouton retour + Petit Logo
     col_back, col_logo_mini = st.columns([8, 2])
     with col_back:
         if st.button("⬅ Retour"):
@@ -230,7 +142,6 @@ else:
                             img = st.camera_input(f"Scanner {matiere}", key=f"cam_{matiere}")
                             if img:
                                 st.session_state.photos_temp[matiere] = img
-                                st.success(f"Image prête !")
 
     st.markdown("---")
     if st.button("💾 ENREGISTRER DANS EXCEL ET PHOTOS", type="primary", use_container_width=True):
@@ -249,9 +160,8 @@ else:
 
             h = {'date': date_saisie, 'flux': flux_sel, 'equipe': equipe_sel, 'lieu': lieu_sel}
             if enregistrer_donnees(st.session_state.mode, h, dict_entrees):
-                st.success(f"✅ Sauvegardé : {nom_dossier}")
+                st.success(f"✅ Sauvegardé avec succès !")
                 st.balloons()
                 st.session_state.photos_temp.clear()
-                
         except Exception as e:
-            st.error(f"❌ Erreur sauvegarde : {e}")
+            st.error(f"❌ Erreur : {e}")
