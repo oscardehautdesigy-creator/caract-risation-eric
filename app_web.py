@@ -64,6 +64,7 @@ def enregistrer_donnees(mode, header, dict_poids):
 # --- INTERFACE ---
 st.set_page_config(page_title="PAPREC - Caractérisation", layout="wide")
 
+# Initialisation du session_state
 if 'mode' not in st.session_state:
     st.session_state.mode = None
 if 'photos_temp' not in st.session_state:
@@ -71,6 +72,11 @@ if 'photos_temp' not in st.session_state:
 
 # --- ECRAN D'ACCUEIL ---
 if st.session_state.mode is None:
+    # Centrage du Logo
+    col_l1, col_l2, col_l3 = st.columns([1, 1.5, 1])
+    with col_l2:
+        st.image("PAPREC_Logotype_V_BLACK.jpg", use_container_width=True)
+
     # TITRE CENTRÉ
     st.markdown("<h1 style='text-align: center; color: #0070c0;'>Fiche de caractérisation</h1>", unsafe_allow_html=True)
     
@@ -85,8 +91,13 @@ if st.session_state.mode is None:
 
 # --- ECRAN DE SAISIE ---
 else:
-    st.button("⬅ Retour", on_click=lambda: (setattr(st.session_state, 'mode', None), st.session_state.photos_temp.clear()))
-    
+    # Affichage du logo réduit en haut à gauche pendant la saisie
+    col_back, col_logo_mini = st.columns([8, 2])
+    with col_back:
+        st.button("⬅ Retour", on_click=lambda: (setattr(st.session_state, 'mode', None), st.session_state.photos_temp.clear()))
+    with col_logo_mini:
+        st.image("PAPREC_Logotype_V_BLACK.jpg", width=120)
+
     # TITRE DE SAISIE CENTRÉ
     st.markdown(f"<h2 style='text-align: center;'>Saisie : {st.session_state.mode}</h2>", unsafe_allow_html=True)
 
