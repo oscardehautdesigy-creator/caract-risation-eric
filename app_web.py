@@ -76,7 +76,7 @@ if 'session_time' not in st.session_state:
 
 # --- ECRAN D'ACCUEIL ---
 if st.session_state.mode is None:
-    st.title("🏭 Système de Caractérisation")
+    st.title("Fiche de caractérisation")
     c1, c2 = st.columns(2)
     if c1.button("📥 CARACT ENTRANT", use_container_width=True):
         st.session_state.mode = "CARACT ENTRANT"
